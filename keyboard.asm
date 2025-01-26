@@ -28,10 +28,18 @@ isr:
     mov bx, 1                      
     mov bl, al                    
     mov di, bx                      
-    mov al, [scancode_table + di]  
-    cmp al, 1                       
+    mov al, [scancode_table + di] 
 
+    ; handling special ch 
+    cmp al, 1                       
     je print_new_ln
+
+    cmp al, 8
+    je print_backspace
+
+    cmp al, 9
+    je print_tab
+
     mov ah, 0x0e
     int 0x10
 
@@ -69,6 +77,48 @@ print_new_ln:
     out 0x20, al
     jmp done
 
+print_backspace:
+    mov ah, 0x0e
+
+    mov al, 0x08
+    int 0x10
+    mov al, 0x20
+    int 0x10
+    mov al, 0x08
+    int 0x10
+    
+    in al, 0x61                     ; keybrd control
+    or al, 0x80                     ; disable bit 7
+    out 0x61, al                    ; send it back
+    and al, 0x7f                    ; get original
+    out 0x61, al                    ; send that back
+
+    mov al, 0x20
+    out 0x20, al
+    jmp done
+
+print_tab:
+    mov ah, 0x0e
+
+    mov al, 0x20
+    int 0x10
+    mov al, 0x20
+    int 0x10
+    mov al, 0x20
+    int 0x10
+    mov al, 0x20
+    int 0x10
+    
+    in al, 0x61                     ; keybrd control
+    or al, 0x80                     ; disable bit 7
+    out 0x61, al                    ; send it back
+    and al, 0x7f                    ; get original
+    out 0x61, al                    ; send that back
+
+    mov al, 0x20
+    out 0x20, al
+    jmp done
+
 %include "print_ascii.asm"
 
 START_STRING:
@@ -76,7 +126,7 @@ START_STRING:
 
 scancode_table:
     db '1', '2', '1', '2', '3', '4', '5', '6'
-    db '7', '8', '9', '0', '-', '=', 'B', 'T'   ; 0-15
+    db '7', '8', '9', '0', '-', '=', 8, 9   ; 0-15
     db 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i'
     db 'o', 'p', '[', ']', 1, 'C', 'a', 's'   ; 16-31
     db 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';'
