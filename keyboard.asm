@@ -1,11 +1,16 @@
 org 0x1000
 [bits 16]
 
+input_buffer: times 32 db 0
+buffer_ptr: dw input_buffer
+input_length: db 0
+last_key: db 0
+
 start:
     call print_nl
     mov bx, START_STRING
     call print
-    call print_nl
+    call print_nl_with_antet
     cli
     mov ax, 0x0000
     mov es, ax
@@ -41,27 +46,18 @@ isr:
     cmp al, 9
     je print_key_tab
 
-    mov [command], al
-    mov al, [command]
+    mov si, [buffer_ptr]  ; Load buffer pointer
+    mov [si], al          ; Store the key in the buffer
+    inc si
 
     mov ah, 0x0e
     int 0x10
 
     
 
-    in al, 0x61                     ; keybrd control
-    or al, 0x80                     ; disable bit 7
-    out 0x61, al                    ; send it back
-    and al, 0x7f                    ; get original
-    out 0x61, al                    ; send that back
+    call acknowledge_key_press
 
-    mov al, 0x20
-    out 0x20, al
-
-    add cl, 1
-
-    popa
-    iret
+    jmp done
 
 done:
     popa
@@ -73,9 +69,22 @@ key_release:
     out 0x20, al
     jmp done
 
-print_key_nl:
-    call print_nl
-    mov cl, 1
+check_commands:
+    
+    lea si, input_buffer
+    lea di, hello_cmd
+    mov bx, input_buffer
+    call compare_string
+    cmp al, 0
+    jnz .print_hello
+    ret
+
+    .print_hello:
+        mov bx, HELLO
+        call print
+        ret
+
+acknowledge_key_press:
     in al, 0x61                     ; keybrd control
     or al, 0x80                     ; disable bit 7
     out 0x61, al                    ; send it back
@@ -84,9 +93,26 @@ print_key_nl:
 
     mov al, 0x20
     out 0x20, al
+
+    ret
+
+print_key_nl:
+    mov byte [buffer_ptr], 0
+    call print_nl
+    call check_commands
+    call print_nl_with_antet
+    call acknowledge_key_press
     jmp done
 
+    
+
 print_key_backspace:
+
+    mov si, [buffer_ptr]
+    dec si
+    mov word [buffer_ptr], si
+
+
     mov ah, 0x0e
 
     mov al, 0x08
@@ -95,15 +121,8 @@ print_key_backspace:
     int 0x10
     mov al, 0x08
     int 0x10
-    
-    in al, 0x61                     ; keybrd control
-    or al, 0x80                     ; disable bit 7
-    out 0x61, al                    ; send it back
-    and al, 0x7f                    ; get original
-    out 0x61, al                    ; send that back
 
-    mov al, 0x20
-    out 0x20, al
+    call acknowledge_key_press
     jmp done
 
 print_key_tab:
@@ -118,20 +137,37 @@ print_key_tab:
     mov al, 0x20
     int 0x10
     
-    in al, 0x61                     ; keybrd control
-    or al, 0x80                     ; disable bit 7
-    out 0x61, al                    ; send it back
-    and al, 0x7f                    ; get original
-    out 0x61, al                    ; send that back
-
-    mov al, 0x20
-    out 0x20, al
+    call acknowledge_key_press
     jmp done
+
+compare_string:
+    ; SI: First string, DI: Second string
+    xor cx, cx
+    .loop:
+        mov al, [si]
+        mov bl, [di]
+        cmp al, 0
+        je .return_equal
+        cmp bl, 0
+        je .not_equal
+        cmp al, bl
+        jne .not_equal
+        inc si
+        inc di
+        jmp .loop
+    .not_equal:
+        xor al, al
+        ret
+    .return_equal:
+        mov al, 1
+        ret
+
 
 %include "print_ascii.asm"
 
-START_STRING:
-    db 'Init ISR...', 0
+START_STRING: db 'Init ISR...', 0
+HELLO: db 'Hello', 0
+hello_cmd: db "hello", 0
 
 scancode_table:
     db '1', '2', '1', '2', '3', '4', '5', '6'
@@ -142,12 +178,6 @@ scancode_table:
     db '\'', '`', '0', '\\', 'z', 'x', 'c', 'v' ; 32-47
     db 'b', 'S', 'm', 'z', 'x', 'c', 'v', 'b'  ; 48-63
     db 'n', 'm'                                ; 64
-
-command:
-    db 0,
-    db 0,
-    db 0,
-    db 0
 
 times 510-($-$$) db 0
 dw 0xaa55
