@@ -2,6 +2,7 @@ org 0x1000
 [bits 16]
 
 start:
+    call print_nl
     mov bx, START_STRING
     call print
     call print_nl
@@ -32,16 +33,21 @@ isr:
 
     ; handling special ch 
     cmp al, 1                       
-    je print_new_ln
+    je print_key_nl
 
     cmp al, 8
-    je print_backspace
+    je print_key_backspace
 
     cmp al, 9
-    je print_tab
+    je print_key_tab
+
+    mov [command], al
+    mov al, [command]
 
     mov ah, 0x0e
     int 0x10
+
+    
 
     in al, 0x61                     ; keybrd control
     or al, 0x80                     ; disable bit 7
@@ -51,6 +57,8 @@ isr:
 
     mov al, 0x20
     out 0x20, al
+
+    add cl, 1
 
     popa
     iret
@@ -65,8 +73,9 @@ key_release:
     out 0x20, al
     jmp done
 
-print_new_ln:
+print_key_nl:
     call print_nl
+    mov cl, 1
     in al, 0x61                     ; keybrd control
     or al, 0x80                     ; disable bit 7
     out 0x61, al                    ; send it back
@@ -77,7 +86,7 @@ print_new_ln:
     out 0x20, al
     jmp done
 
-print_backspace:
+print_key_backspace:
     mov ah, 0x0e
 
     mov al, 0x08
@@ -97,7 +106,7 @@ print_backspace:
     out 0x20, al
     jmp done
 
-print_tab:
+print_key_tab:
     mov ah, 0x0e
 
     mov al, 0x20
@@ -134,6 +143,11 @@ scancode_table:
     db 'b', 'S', 'm', 'z', 'x', 'c', 'v', 'b'  ; 48-63
     db 'n', 'm'                                ; 64
 
+command:
+    db 0,
+    db 0,
+    db 0,
+    db 0
+
 times 510-($-$$) db 0
 dw 0xaa55
-
