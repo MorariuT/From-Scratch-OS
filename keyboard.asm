@@ -25,16 +25,16 @@ isr:
     cmp al, 0x80                    ; Check if it's a key release event
     ja key_release                  ; Ignore key release events (scancode >= 0x80)
 
-    mov bx, 1                       ; Clear bx
-    mov bl, al                      ; Copy scancode to bl (low byte of bx)
-    mov di, bx                      ; Move bx to di (index register)
-    mov al, [scancode_table + di]   ; Get ASCII character from table
-    cmp al, 1                       ; Check if it's a non-printable key
+    mov bx, 1                      
+    mov bl, al                    
+    mov di, bx                      
+    mov al, [scancode_table + di]  
+    cmp al, 1                       
 
     je print_new_ln
-
     mov ah, 0x0e
     int 0x10
+
     in al, 0x61                     ; keybrd control
     or al, 0x80                     ; disable bit 7
     out 0x61, al                    ; send it back
@@ -58,7 +58,6 @@ key_release:
     jmp done
 
 print_new_ln:
-    pusha
     call print_nl
     in al, 0x61                     ; keybrd control
     or al, 0x80                     ; disable bit 7
@@ -68,8 +67,7 @@ print_new_ln:
 
     mov al, 0x20
     out 0x20, al
-    popa
-    ret
+    jmp done
 
 %include "print_ascii.asm"
 
