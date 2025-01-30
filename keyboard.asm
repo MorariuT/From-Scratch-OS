@@ -39,21 +39,23 @@ isr:
     ; handling special ch 
     cmp al, 1                       
     je print_key_nl
-
     cmp al, 8
     je print_key_backspace
-
     cmp al, 9
     je print_key_tab
-
-    mov si, [buffer_ptr]  ; Load buffer pointer
-    mov [si], al          ; Store the key in the buffer
-    inc si
 
     mov ah, 0x0e
     int 0x10
 
-    
+
+    mov bl, [input_length]
+    cmp bl, 255
+    jae done
+
+    movzx bx, bl
+    mov [input_buffer + bx], al
+    inc byte [input_length]
+
 
     call acknowledge_key_press
 
@@ -62,12 +64,6 @@ isr:
 done:
     popa
     iret
-
-key_release:
-    ; Acknowledge interrupt to PIC
-    mov al, 0x20
-    out 0x20, al
-    jmp done
 
 check_commands:
     
@@ -84,77 +80,16 @@ check_commands:
         call print
         ret
 
-acknowledge_key_press:
-    in al, 0x61                     ; keybrd control
-    or al, 0x80                     ; disable bit 7
-    out 0x61, al                    ; send it back
-    and al, 0x7f                    ; get original
-    out 0x61, al                    ; send that back
-
-    mov al, 0x20
-    out 0x20, al
-
-    ret
-
-print_key_nl:
-    mov byte [buffer_ptr], 0
-    call print_nl
-    call check_commands
-    call print_nl_with_antet
-    call acknowledge_key_press
-    jmp done
-
-    
-
-print_key_backspace:
-
-    mov si, [buffer_ptr]
-    dec si
-    mov word [buffer_ptr], si
-
-
-    mov ah, 0x0e
-
-    mov al, 0x08
-    int 0x10
-    mov al, 0x20
-    int 0x10
-    mov al, 0x08
-    int 0x10
-
-    call acknowledge_key_press
-    jmp done
-
-print_key_tab:
-    mov ah, 0x0e
-
-    mov al, 0x20
-    int 0x10
-    mov al, 0x20
-    int 0x10
-    mov al, 0x20
-    int 0x10
-    mov al, 0x20
-    int 0x10
-    
-    call acknowledge_key_press
-    jmp done
-
 compare_string:
     ; SI: First string, DI: Second string
     xor cx, cx
     .loop:
         mov al, [si]
         mov bl, [di]
-        cmp al, 0
-        je .return_equal
-        cmp bl, 0
-        je .not_equal
         cmp al, bl
         jne .not_equal
-        inc si
-        inc di
-        jmp .loop
+        cmp al, bl
+        je .loop
     .not_equal:
         xor al, al
         ret
@@ -164,10 +99,13 @@ compare_string:
 
 
 %include "print_ascii.asm"
+%include "keyboard_specials.asm"
+%include "buffer_manip.asm"
 
 START_STRING: db 'Init ISR...', 0
 HELLO: db 'Hello', 0
 hello_cmd: db "hello", 0
+INPUT_LENGHT_PRINT: db 'Input Lenght: ', 0
 
 scancode_table:
     db '1', '2', '1', '2', '3', '4', '5', '6'
