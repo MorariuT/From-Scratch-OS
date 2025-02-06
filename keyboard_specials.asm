@@ -27,10 +27,20 @@ print_key_nl:
 
 print_key_backspace:
 
+    mov bx, [buffer_ptr]
+    sub bx, [input_length]
+
     mov si, [buffer_ptr]
     dec si
-    mov word [buffer_ptr], si
 
+    cmp si, bx
+    jb .done
+
+    mov word [buffer_ptr], si
+    
+    mov si, [input_length]
+    dec si
+    mov word [input_length], si
 
     mov ah, 0x0e
 
@@ -41,8 +51,11 @@ print_key_backspace:
     mov al, 0x08
     int 0x10
 
-    call acknowledge_key_press
-    jmp done
+    jmp .done
+
+    .done:
+        call acknowledge_key_press
+        jmp done
 
 print_key_tab:
     mov ah, 0x0e
